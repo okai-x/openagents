@@ -200,6 +200,13 @@ def backup():
         subprocess.run(["git", "-C", str(ASSETS), "bundle", "create", str(target / "assets.bundle"), "--all"], check=True)
         with tarfile.open(target / 'assets-working-tree.tar.gz', 'w:gz') as archive:
             archive.add(ASSETS, arcname='assets', filter=lambda item: None if '/.git/' in item.name or item.name.endswith('/.git') else item)
+    # Preserve the local adaptation without duplicating the large upstream history.
+    base = subprocess.check_output(['git', '-C', str(REPO), 'rev-parse', '0a0ab10ba']).decode().strip()
+    head = subprocess.check_output(['git', '-C', str(REPO), 'rev-parse', 'HEAD']).decode().strip()
+    (target / 'source-changes.patch').write_bytes(subprocess.check_output(
+        ['git', '-C', str(REPO), 'diff', '--binary', base, 'HEAD']))
+    write_json(target / 'source.json', {'repository': 'https://github.com/openagents-org/openagents.git',
+                                      'base_commit': base, 'head_commit': head})
     checksums = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in target.iterdir() if p.is_file()}
     write_json(target / "manifest.json", {"created_at": datetime.now(timezone.utc).isoformat(), "sha256": checksums})
     print(f"Backup created: {target}")
