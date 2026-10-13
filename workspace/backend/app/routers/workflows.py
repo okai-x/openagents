@@ -265,6 +265,7 @@ def update_workflow(
     db: Session = Depends(get_db),
     x_workspace_token: Optional[str] = Header(None),
     authorization: Optional[str] = Header(None),
+    if_match: Optional[str] = Header(None),
 ):
     workspace = _resolve_workspace(db, body.network)
     if not workspace:
@@ -276,10 +277,16 @@ def update_workflow(
         select(Workflow).where(
             Workflow.id == workflow_id,
             Workflow.workspace_id == str(workspace.id),
-        )
+        ).with_for_update()
     ).scalar_one_or_none()
     if not workflow:
         return json_response(ResponseCode.NOT_FOUND, "Workflow not found")
+
+    if if_match is not None:
+        from app.asset_revision import asset_revision
+        revision = asset_revision({k: getattr(workflow, k) for k in ("name", "description", "steps", "max_iterations")})
+        if if_match.strip('"') != revision:
+            return json_response(ResponseCode.BAD_REQUEST, "Workflow changed since export; merge before publishing", status_code=412)
 
     if body.name is not None:
         name = body.name.strip()

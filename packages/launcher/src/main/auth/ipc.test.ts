@@ -242,3 +242,22 @@ it("hands the page the web origin its shared links must carry", () => {
   fakes.listeners.get("workspace-view:config")!(event)
   expect(event.returnValue?.webUrl).toBe("https://workspace.openagents.org")
 })
+
+it("isolates an explicit local workspace from the hosted account session", async () => {
+  registerAccountIpc({
+    localWorkspace: () => ({ endpoint: "http://127.0.0.1:18765", slug: "local123", token: "local-token-for-test-only" }),
+    endpoint: () => "http://127.0.0.1:18765",
+    appearance: () => ({ theme: "system", language: "en" }),
+    setAppearance: fakes.setAppearance,
+    getWindow: () => ({ webContents: { send: fakes.send } }) as never,
+    connectNode: fakes.connectNode, nodeStatus: fakes.nodeStatus,
+  })
+  expect(fakes.handlers.get("account:get")!()).toBeNull()
+  fakes.accountDeps!.onChange({ email: "person@example.test" })
+  fakes.accountDeps!.onChange(null)
+  expect(fakes.sendSession).not.toHaveBeenCalled()
+  expect(fakes.hostSignOut).not.toHaveBeenCalled()
+  await fakes.handlers.get("workspace-view:show")!({}, "local123", bounds, "local-token-for-test-only")
+  expect(fakes.bearer).not.toHaveBeenCalled()
+  expect(fakes.show).toHaveBeenCalledExactlyOnceWith("local123", bounds, "local-token-for-test-only", null)
+})

@@ -74,6 +74,8 @@ try {
   // so a view that exists always belongs to a signed-in account.
   if (config?.session) {
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(config.session))
+  } else {
+    window.localStorage.removeItem(SESSION_KEY)
   }
 
   // next-themes reads this key as it initialises. Writing it here rather than

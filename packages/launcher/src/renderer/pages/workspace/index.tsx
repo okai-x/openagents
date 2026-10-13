@@ -18,6 +18,7 @@ export default function WorkspacePage(_props: {
 }): React.JSX.Element {
   const { t } = useTranslation()
   const account = useAccountStore((s) => s.account)
+  const localWorkspace = useAccountStore((s) => s.localWorkspace)
   const authMode = useAccountStore((s) => s.authMode)
   const targetSignal = useAccountStore((s) => s.workspaceTargetSignal)
   const hostRef = React.useRef<HTMLDivElement>(null)
@@ -28,7 +29,7 @@ export default function WorkspacePage(_props: {
 
   React.useEffect(() => {
     const host = hostRef.current
-    if (!host || !account) return
+    if (!host || (!account && !localWorkspace)) return
     if (modalOpen) { void window.api.hideWorkspaceView(); return }
     let cancelled = false
     let shown = false
@@ -59,9 +60,9 @@ export default function WorkspacePage(_props: {
       window.removeEventListener("resize", push)
       void window.api.hideWorkspaceView()
     }
-  }, [account?.email, modalOpen, attempt, targetSignal])
+  }, [account?.email, localWorkspace, modalOpen, attempt, targetSignal])
 
-  if (!account) return authMode === "welcome" ? <WelcomePage /> : <WorkspaceSignIn />
+  if (!account && !localWorkspace) return authMode === "welcome" ? <WelcomePage /> : <WorkspaceSignIn />
   return <div ref={hostRef} className="relative h-full min-h-0">
     <div className="flex h-full flex-col items-center justify-center gap-3">
       {error === "missing" ? (

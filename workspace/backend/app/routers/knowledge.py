@@ -292,12 +292,13 @@ async def update_knowledge(
     db: Session = Depends(get_db),
     x_workspace_token: Optional[str] = Header(None),
     authorization: Optional[str] = Header(None),
+    if_match: Optional[str] = Header(None),
 ):
     entry = db.execute(
         select(KnowledgeEntry).where(
             KnowledgeEntry.id == entry_id,
             KnowledgeEntry.status == "active",
-        )
+        ).with_for_update()
     ).scalar_one_or_none()
     if not entry:
         return json_response(ResponseCode.NOT_FOUND, "Knowledge entry not found")
@@ -309,6 +310,14 @@ async def update_knowledge(
         return json_response(ResponseCode.UNAUTHORIZED, "Invalid credentials")
 
     ws_id = str(workspace.id)
+    if entry.workspace_id != ws_id:
+        return json_response(ResponseCode.NOT_FOUND, "Knowledge entry not found")
+    if if_match is not None:
+        from app.asset_revision import asset_revision
+        current_content = get_file_store().read(entry.storage_key).decode("utf-8") if entry.storage_key else ""
+        revision = asset_revision({"title": entry.title, "description": entry.description or "", "content": current_content})
+        if if_match.strip('"') != revision:
+            return json_response(ResponseCode.BAD_REQUEST, "Knowledge changed since export; merge before publishing", status_code=412)
     now = datetime.now(timezone.utc)
 
     if body.title is not None and body.title != entry.title:
