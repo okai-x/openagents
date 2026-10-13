@@ -219,8 +219,8 @@ def verify_backup():
 
 def automation():
     command = [str(PYTHON), str(Path(__file__).resolve())]
-    install_service("assets", command + ["export"], interval=300)
-    install_service("backup", command + ["backup"], interval=21600)
+    install_service("assets", command + ["export"], interval=21600)
+    install_service("backup", command + ["backup"], interval=86400)
 
 
 def db():

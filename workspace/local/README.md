@@ -32,7 +32,7 @@ From the asset directory:
 
 The asset repo contains `AGENTS.md`, a usage guide, workspace and agent metadata, and a manually triggered asset-refinement workflow. No remote Git repository is configured.
 
-Exports run every 5 minutes. Backups run every 6 hours. LaunchAgents start after macOS login and resume after sleep; this is not an always-on server while the Mac sleeps. Backups currently have no automatic deletion policy. They are private archives on the same disk, not offsite disaster recovery.
+Exports run every 6 hours. Backups run every 24 hours. Each scheduled job also runs once when its LaunchAgent loads, including login or an explicit reload. LaunchAgents operate after macOS login; jobs do not execute while the Mac sleeps. Backups currently have no automatic deletion policy. They are private archives on the same disk, not offsite disaster recovery.
 
 ## Synchronization behavior
 
