@@ -795,7 +795,9 @@ def update_member(
         from app.skill_catalog import get_skill_defaults
         defaults = get_skill_defaults()
         valid = {k: v for k, v in body.enabled_skills.items() if k in defaults}
-        member.enabled_skills = valid or None
+        # Install state and the reported inventory are not toggles: keep them.
+        kept = {k: v for k, v in (member.enabled_skills or {}).items() if k not in defaults}
+        member.enabled_skills = {**kept, **valid} or None
     if body.model is not None:
         model = body.model.strip()
         if len(model) > 200:
@@ -1285,6 +1287,87 @@ def report_skill_status(
         "state": body.state,
         "installedSkills": list(skills_data.get("installed", [])),
         "skillStatus": skills_data.get("skill_status", {}),
+    })
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/workspaces/{workspace_id}/members/{agent_name}/inventory
+# ---------------------------------------------------------------------------
+
+class InventoryItem(BaseModel):
+    name: str
+    description: Optional[str] = None
+    source: Optional[str] = None
+    state: Optional[str] = None
+    location: Optional[str] = None
+    transport: Optional[str] = None
+
+
+class InventoryRequest(BaseModel):
+    runtime: Optional[str] = None
+    modules: List[InventoryItem] = Field(default_factory=list)
+    skills: List[InventoryItem] = Field(default_factory=list)
+    mcp: List[InventoryItem] = Field(default_factory=list)
+    flags: Dict[str, bool] = Field(default_factory=dict)
+
+
+_INVENTORY_LIMITS = {
+    "name": 120, "description": 300, "source": 20, "state": 20, "location": 300, "transport": 20,
+}
+
+
+def _clean_inventory_items(items: List[InventoryItem], cap: int) -> List[dict]:
+    rows = []
+    for item in items[:cap]:
+        row = {k: str(getattr(item, k))[:limit] for k, limit in _INVENTORY_LIMITS.items() if getattr(item, k)}
+        if row.get("name"):
+            rows.append(row)
+    return rows
+
+
+@router.post("/{workspace_id}/members/{agent_name}/inventory")
+def report_inventory(
+    workspace_id: str,
+    agent_name: str,
+    body: InventoryRequest,
+    db: Session = Depends(get_db),
+    x_workspace_token: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None),
+):
+    """Launcher → workspace: what an agent can actually use (tool modules,
+    skills by source, MCP servers) for its skills panel. Stored under
+    ``enabled_skills.inventory`` so it travels with the agent list."""
+    workspace = db.execute(
+        select(Workspace).where(_workspace_filter(workspace_id))
+    ).scalar_one_or_none()
+    if not workspace:
+        return json_response(ResponseCode.NOT_FOUND, "Workspace not found")
+    if not _verify_workspace_access(workspace, x_workspace_token, authorization):
+        return json_response(ResponseCode.UNAUTHORIZED, "Invalid credentials")
+
+    member = db.execute(
+        select(WorkspaceMember).where(
+            WorkspaceMember.workspace_id == workspace.id,
+            WorkspaceMember.agent_name == agent_name,
+        )
+    ).scalar_one_or_none()
+    if not member:
+        return json_response(ResponseCode.NOT_FOUND, "Member not found")
+
+    inventory = {
+        "runtime": (body.runtime or "")[:20] or None,
+        "modules": _clean_inventory_items(body.modules, 50),
+        "skills": _clean_inventory_items(body.skills, 300),
+        "mcp": _clean_inventory_items(body.mcp, 100),
+        "flags": {str(k)[:40]: bool(v) for k, v in list(body.flags.items())[:20]},
+        "reported_at": datetime.now(timezone.utc).isoformat(),
+    }
+    skills_data = dict(member.enabled_skills or {})
+    skills_data["inventory"] = inventory
+    member.enabled_skills = skills_data
+    db.commit()
+    return success_response({
+        "agentName": agent_name, "skills": len(inventory["skills"]), "mcp": len(inventory["mcp"]),
     })
 
 
