@@ -53,7 +53,14 @@ function seedAgentHome(type, dir, homeDir = os.homedir(), env = process.env) {
   if (type === 'codex') {
     write('config.toml', "# This agent's own Codex config. ~/.codex is not read.\n");
   } else if (type === 'claude') {
-    const settings = { skipDangerousModePermissionPrompt: true };
+    // A separate config dir still signs in to the person's claude.ai account,
+    // which would hand the role their connectors and synced skills and plugins.
+    const settings = {
+      skipDangerousModePermissionPrompt: true,
+      disableClaudeAiConnectors: true,
+      syncClaudeAiSkills: false,
+      syncClaudeAiPlugins: false,
+    };
     const proxy = proxyEnv(homeDir, env);
     if (Object.keys(proxy).length) settings.env = proxy;
     write('settings.json', `${JSON.stringify(settings, null, 2)}\n`);

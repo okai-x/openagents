@@ -37,6 +37,10 @@ describe('ensureAgentHomes', () => {
     assert.ok(fs.existsSync(path.join(codexHome, 'config.toml')));
     const settings = JSON.parse(fs.readFileSync(path.join(claudeHome, 'settings.json'), 'utf-8'));
     assert.deepEqual(settings.env, { HTTPS_PROXY: 'http://127.0.0.1:7897' });
+    // Signing in to the same claude.ai account must not bring its extras along.
+    assert.equal(settings.disableClaudeAiConnectors, true);
+    assert.equal(settings.syncClaudeAiSkills, false);
+    assert.equal(settings.syncClaudeAiPlugins, false);
     assert.equal(fs.statSync(claudeHome).mode & 0o777, 0o700);
   });
 
