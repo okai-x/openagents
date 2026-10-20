@@ -2632,6 +2632,7 @@ function setupIPC(): void {
   // module: signing in gates the workspace half of the app. Earlier handlers
   // read the manager when invoked, after setup has finished.
   accountManager = registerAccountIpc({
+    localWorkspace: () => store.get("localWorkspace"),
     endpoint: () => normalizeWorkspaceEndpoint(store.get("workspaceEndpoint")),
     getWindow: () => mainWindow,
     connectNode: (code) => requireManager().connectNode(code),

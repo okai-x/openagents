@@ -6,6 +6,7 @@ import { accountError } from "../lib/account-errors"
 import i18n from "../i18n"
 import type { AccountInfo, CaptchaPass } from "../types"
 import { readAppEntry, rememberAppEntry, type AppMode } from "../lib/app-entry"
+import { readLocalWorkspace, type LocalWorkspace } from "../../shared/local-workspace"
 
 /**
  * Desktop account and entry navigation. Workspace membership and its UI are
@@ -27,6 +28,7 @@ export interface WorkspaceTarget {
 }
 
 interface AccountState {
+  localWorkspace: LocalWorkspace | null
   account: AccountInfo | null
   mode: AppMode
   /** What the Workspace side shows while signed out. */
@@ -71,7 +73,24 @@ interface AccountState {
   clearError: () => void
 }
 
+/**
+ * The self-hosted workspace configured for token entry, if any. Settings that
+ * cannot be read (an older preload bridge, a failed IPC call) mean "none", so
+ * the hosted account path still loads.
+ */
+async function configuredLocalWorkspace(): Promise<LocalWorkspace | null> {
+  try {
+    const [entry, endpoint] = await Promise.all([
+      window.api.getSetting("localWorkspace"), window.api.getSetting("workspaceEndpoint"),
+    ])
+    return readLocalWorkspace(entry, endpoint)
+  } catch {
+    return null
+  }
+}
+
 export const useAccountStore = create<AccountState>((set, get) => ({
+  localWorkspace: null,
   account: null,
   mode: "workspace",
   authMode: "welcome",
@@ -96,6 +115,8 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
 
   openWorkspaces: () => {
+    const local = get().localWorkspace
+    if (local) { get().openWorkspace(local); return }
     void window.api.openWorkspaceHome()
     get().enterWorkspaceMode()
   },
@@ -151,7 +172,12 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       showGlobalToast(accountError(message, i18n.t.bind(i18n)), "error")
     })
     try {
-      set({ account: await window.api.getAccount() })
+      const local = await configuredLocalWorkspace()
+      if (local) {
+        set({ localWorkspace: local, account: null, workspaceTarget: local, mode: "workspace" })
+      } else {
+        set({ account: await window.api.getAccount() })
+      }
     } catch (err) {
       console.error("getAccount failed:", err)
     } finally {

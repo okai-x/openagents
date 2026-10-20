@@ -9,7 +9,7 @@ const account = { email: "person@example.test", displayName: "Person", expiresAt
 beforeEach(() => {
   localStorage.clear()
   useAccountStore.setState({
-    account: null, mode: "workspace", authMode: "welcome",
+    account: null, localWorkspace: null, mode: "workspace", authMode: "welcome",
     workspaceTarget: null, workspaceTargetSignal: 0, ready: false,
   })
   window.api = {
@@ -27,6 +27,18 @@ it("finishes startup if a hot-reloaded renderer has the previous preload bridge"
   await useAccountStore.getState().init()
   expect(window.api.getAccount).toHaveBeenCalledOnce()
   expect(useAccountStore.getState()).toMatchObject({ ready: true, account, mode: "workspace" })
+})
+
+it("enters a configured local workspace without reading the hosted account", async () => {
+  const endpoint = "http://127.0.0.1:18800"
+  const local = { endpoint, slug: "local-ws", token: "local-workspace-token-for-test" }
+  window.api.getSetting = vi.fn((key: string) =>
+    Promise.resolve(key === "localWorkspace" ? local : endpoint)) as unknown as typeof window.api.getSetting
+  await useAccountStore.getState().init()
+  expect(window.api.getAccount).not.toHaveBeenCalled()
+  expect(useAccountStore.getState()).toMatchObject({
+    ready: true, account: null, localWorkspace: local, workspaceTarget: local, mode: "workspace",
+  })
 })
 
 it("keeps local tools accessible when the account read fails", async () => {

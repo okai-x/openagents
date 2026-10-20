@@ -14,6 +14,7 @@ import { webBase } from "./endpoints"
 import type { AccountInfo } from "./session-store"
 import type { NodeStatus } from "../agent-manager"
 import { pushNotification } from "../notifications"
+import { readLocalWorkspace } from "../../shared/local-workspace"
 
 /**
  * The account's IPC surface, kept out of index.ts.
@@ -23,6 +24,7 @@ import { pushNotification } from "../notifications"
  */
 
 export interface AccountIpcDeps {
+  localWorkspace?: () => unknown
   /**
    * The look and feel the launcher is currently in, and a way to change it.
    * The hosted workspace shares both — see shared/appearance-bridge.
@@ -45,6 +47,7 @@ export interface AccountIpcDeps {
 const NOTICE_TYPES = new Set(["info", "success", "error", "warning"])
 
 export function registerAccountIpc(deps: AccountIpcDeps): AccountManager {
+  const localWorkspace = () => readLocalWorkspace(deps.localWorkspace?.(), deps.endpoint())
   let workspaceHost: WorkspaceHost | null = null
   let viewRequest = 0
   const seenReplies = new Set<string>()
@@ -52,6 +55,7 @@ export function registerAccountIpc(deps: AccountIpcDeps): AccountManager {
     endpoint: deps.endpoint,
     openExternal: (url) => void openExternalSafely(url),
     onChange: (info: AccountInfo | null) => {
+      if (localWorkspace()) return
       if (!info) {
         seenReplies.clear()
         // Every way an account ends — signed out here or from the page,
@@ -72,7 +76,8 @@ export function registerAccountIpc(deps: AccountIpcDeps): AccountManager {
   const host = new WorkspaceHost({
     getWindow: deps.getWindow,
     endpoint: deps.endpoint,
-    session: () => account.embeddedSession(),
+    // An official account session must never be injected into a local token workspace.
+    session: () => localWorkspace() ? null : account.embeddedSession(),
     // Google and GitHub cannot finish in the app, so their sign-in runs in the
     // browser and comes back over loopback — the same flow the launcher used
     // before any of this was embedded.
@@ -99,7 +104,7 @@ export function registerAccountIpc(deps: AccountIpcDeps): AccountManager {
       : undefined
   }
 
-  ipcMain.handle("account:get", () => account.getAccount())
+  ipcMain.handle("account:get", () => localWorkspace() ? null : account.getAccount())
   ipcMain.handle("account:captcha-config", () => account.captchaConfig())
   ipcMain.handle("account:sign-in", () => account.signIn())
   ipcMain.handle(
@@ -137,7 +142,7 @@ export function registerAccountIpc(deps: AccountIpcDeps): AccountManager {
       // Renew before the page reads the session: the preload plants whatever
       // is current, synchronously, and a token that lapses an hour into the
       // session would otherwise land the user on the web app's sign-in gate.
-      if (account.getAccount()) await account.bearer().catch(() => null)
+      if (!localWorkspace() && account.getAccount()) await account.bearer().catch(() => null)
       // A view created while the last sign-out is still wiping storage would
       // lose the session it was just given.
       await host.whenCleared()
