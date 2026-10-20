@@ -76,7 +76,7 @@ import {
   setPrefsStorage as setNotifPrefsStorage,
   type NotificationPrefs,
 } from "./notifications"
-import { PORTABLE_NODE_DIR } from "./agents/paths"
+import { LOCAL_CORE, PORTABLE_NODE_DIR } from "./agents/paths"
 import { stopLeftoverDaemon } from "./agents/daemon-process"
 import { bundledCoreDir, readCoreVersion } from "./agents/runtime"
 import {
@@ -363,7 +363,29 @@ function bundledCoreVersion(): string | null {
   }
 }
 
+/**
+ * Version of the connector this build ships next to the app (LOCAL_CORE, from
+ * build.extraResources), or null. coreTiers always runs that copy, so npm
+ * releases are neither fetched nor announced: they would never run.
+ */
+function shippedCoreVersion(): string | null {
+  try {
+    const v = JSON.parse(
+      fs.readFileSync(path.join(LOCAL_CORE, "package.json"), "utf-8"),
+    ).version
+    return typeof v === "string" && v ? v : null
+  } catch {
+    return null
+  }
+}
+
 async function ensureCoreLibrary(): Promise<void> {
+  const shipped = shippedCoreVersion()
+  if (shipped) {
+    slog(`Core library: using v${shipped} shipped with this build`)
+    if (_updateSplash) _updateSplash("Core library ready", 80, "v" + shipped)
+    return
+  }
   const corePkgPath = path.join(GLOBAL_MODULES, CORE_PKG, "package.json")
   let installedVersion: string | null = null
 
@@ -549,6 +571,7 @@ async function ensureCoreLibrary(): Promise<void> {
 }
 
 async function checkCoreUpdate(): Promise<void> {
+  if (shippedCoreVersion()) return
   const npmCmd = findNpmCommand()
   if (!npmCmd) return
   try {

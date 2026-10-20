@@ -22,8 +22,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
-    "build": "npm run build:workspace && electron-vite build",
+    "build": "npm run build:workspace && npm run build:core && electron-vite build",
     "build:workspace": "npm --prefix ../../workspace/frontend run build:desktop && node ./scripts/check-workspace-bundle.mjs",
+    "build:core": "npm --prefix ../agent-connector ci --omit=dev --no-audit --no-fund",
     "preview": "electron-vite preview",
     "build:mac": "npm run build && electron-builder --mac --x64 --arm64 --publish never",
     "build:mac:x64": "npm run build && electron-builder --mac --x64 --publish never",
@@ -118,6 +119,21 @@
       {
         "from": "../../workspace/frontend/dist-desktop",
         "to": "workspace"
+      },
+      {
+        "from": "../agent-connector",
+        "to": "agent-connector",
+        "filter": [
+          "package.json",
+          "registry.json",
+          "bin/**",
+          "src/**",
+          "icons/**"
+        ]
+      },
+      {
+        "from": "../agent-connector/node_modules",
+        "to": "agent-connector/node_modules"
       }
     ],
     "directories": {
