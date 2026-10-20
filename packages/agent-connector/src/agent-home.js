@@ -67,6 +67,51 @@ function seedAgentHome(type, dir, homeDir = os.homedir(), env = process.env) {
   }
 }
 
+/** A home this module manages, as opposed to one a person pointed an agent at. */
+function isManagedHome(dir, homeDir = os.homedir()) {
+  const root = path.join(homeDir, '.openagents', 'homes') + path.sep;
+  return path.resolve(String(dir || '')).startsWith(root);
+}
+
+// Codex always scans ~/.agents/skills, whatever CODEX_HOME says, and offers no
+// switch for the folder: each skill must be turned off by its SKILL.md path.
+const SKILLS_BEGIN = '# >>> openagents: skills in ~/.agents/skills are off for this agent. Rewritten before every run; put your own settings above.';
+const SKILLS_END = '# <<< openagents';
+
+function personalSkillFiles(homeDir = os.homedir()) {
+  const out = [];
+  const walk = (dir, depth) => {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.name === 'SKILL.md' && entry.isFile()) out.push(full);
+      else if (depth < 5 && (entry.isDirectory() || entry.isSymbolicLink())) walk(full, depth + 1);
+    }
+  };
+  walk(path.join(homeDir, '.agents', 'skills'), 0);
+  return out.sort();
+}
+
+/** Keep the block that turns off the person's ~/.agents/skills current in a Codex home. */
+function syncPersonalSkills(codexHome, homeDir = os.homedir()) {
+  const file = path.join(codexHome, 'config.toml');
+  let text = '';
+  try { text = fs.readFileSync(file, 'utf-8'); } catch {}
+  const start = text.indexOf(SKILLS_BEGIN);
+  const end = start === -1 ? -1 : text.indexOf(SKILLS_END, start);
+  const rest = start === -1 ? text
+    : text.slice(0, start) + (end === -1 ? '' : text.slice(end + SKILLS_END.length));
+  const skills = personalSkillFiles(homeDir);
+  const block = skills.length
+    ? [SKILLS_BEGIN, ...skills.map((p) => `[[skills.config]]\npath = ${JSON.stringify(p)}\nenabled = false`), SKILLS_END].join('\n')
+    : '';
+  const kept = rest.replace(/\s+$/, '');
+  const next = (kept ? `${kept}\n` : '') + (block ? `${kept ? '\n' : ''}${block}\n` : '');
+  if (next !== text) fs.writeFileSync(file, next, { mode: 0o600 });
+  return skills.length;
+}
+
 /**
  * Give every Codex and Claude agent that lacks one its own config home and
  * record it in daemon.yaml. Returns the names of the agents that changed.
@@ -85,4 +130,7 @@ function ensureAgentHomes(config, homeDir = os.homedir(), env = process.env) {
   return changed;
 }
 
-module.exports = { HOME_VARS, agentHomeDir, ensureAgentHomes, proxyEnv, seedAgentHome };
+module.exports = {
+  HOME_VARS, agentHomeDir, ensureAgentHomes, isManagedHome, personalSkillFiles,
+  proxyEnv, seedAgentHome, syncPersonalSkills,
+};

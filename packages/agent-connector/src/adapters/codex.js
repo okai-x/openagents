@@ -25,6 +25,7 @@ const https = require('https');
 
 const { whereBinary } = require('../paths');
 const BaseAdapter = require('./base');
+const { isManagedHome, syncPersonalSkills } = require('../agent-home');
 const { redactSecrets, formatAttachmentsForPrompt } = require('./utils');
 const { buildOpenclawSystemPrompt } = require('./workspace-prompt');
 
@@ -321,6 +322,12 @@ class CodexAdapter extends BaseAdapter {
     if (effectiveModel) env.CODEX_MODEL = effectiveModel;
     if (this._directApiKey) env.OPENAI_API_KEY = this._directApiKey;
     if (this._directBaseUrl) env.OPENAI_BASE_URL = this._directBaseUrl;
+
+    // CODEX_HOME does not cover ~/.agents/skills; turn those off again in case
+    // the person added skills since the last run (see agent-home.js).
+    if (env.CODEX_HOME && isManagedHome(env.CODEX_HOME)) {
+      try { syncPersonalSkills(env.CODEX_HOME); } catch (e) { this._log(`Could not turn off ~/.agents/skills: ${e.message}`); }
+    }
 
     const context = this._buildSystemContext(msgChannel);
     const fullPrompt = `${context}\n\n---\n\nUser message:\n${content}${this._attachmentInstructions(attachments)}`;
