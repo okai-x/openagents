@@ -391,9 +391,19 @@ function _parseSkillFrontmatter(skillMdPath) {
     const m = text.match(/^---\s*\n([\s\S]*?)\n---/);
     if (!m) return {};
     const out = {};
-    for (const line of m[1].split('\n')) {
-      const kv = line.match(/^(\w[\w-]*):\s*(.*)$/);
-      if (kv) out[kv[1]] = kv[2].trim().replace(/^["']|["']$/g, '');
+    const lines = m[1].split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const kv = lines[i].match(/^(\w[\w-]*):\s*(.*)$/);
+      if (!kv) continue;
+      let value = kv[2].trim();
+      // A YAML block scalar takes the indented lines below it: `>` folds them
+      // into one line, `|` keeps the line breaks.
+      if (/^[>|][+-]?$/.test(value)) {
+        const block = [];
+        while (i + 1 < lines.length && (/^\s/.test(lines[i + 1]) || !lines[i + 1].trim())) block.push(lines[++i].trim());
+        value = value[0] === '>' ? block.join(' ').replace(/\s+/g, ' ').trim() : block.join('\n').trim();
+      }
+      out[kv[1]] = value.replace(/^["']|["']$/g, '');
     }
     return out;
   } catch {

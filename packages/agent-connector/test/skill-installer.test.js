@@ -486,6 +486,23 @@ describe('listInstalledSkills', () => {
     assert.match(list[0].description, /Build Claude apps/);
     assert.ok(list[0].skillMd.endsWith('SKILL.md'));
   });
+
+  // Community skills often write the description as a YAML block scalar; it
+  // used to come back as the bare indicator ">-".
+  it('reads folded and literal block descriptions', () => {
+    const dir = path.join(workDir, '.codex', 'skills', 'cloudflare');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'SKILL.md'), [
+      '---', 'name: cloudflare', 'description: >-', '  Protect and accelerate websites', '  with Cloudflare.',
+      'notes: |', '  line one', '  line two', 'metadata:', '  author: someone', '---', 'body',
+    ].join('\n'));
+    const meta = installer.parseSkillFrontmatter(path.join(dir, 'SKILL.md'));
+    assert.equal(meta.description, 'Protect and accelerate websites with Cloudflare.');
+    assert.equal(meta.notes, 'line one\nline two');
+    assert.equal(meta.author, undefined);
+    assert.equal(installer.listInstalledSkills({ agentType: 'codex', workingDir: workDir })[0].description,
+      'Protect and accelerate websites with Cloudflare.');
+  });
 });
 
 // ---------------------------------------------------------------------------
