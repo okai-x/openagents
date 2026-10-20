@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { capture, identify } from './analytics';
 import { desktopHost } from './desktop-host';
+import { isLoopbackDesktopApi } from './self-hosted-desktop';
 import { workspaceApi } from './api';
 import { clearWorkspaceSession, loadWorkspaceSession } from './workspace-session';
 
@@ -51,7 +52,10 @@ export function OpenAgentsAuthProvider({ children }: { children: React.ReactNode
 
   useEffect(() => {
     const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-    const isDomain = OPENAGENTS_HOSTNAMES.includes(hostname);
+    const apiUrl = typeof window !== 'undefined'
+      ? (window as unknown as { __OA_API_URL__?: string }).__OA_API_URL__
+      : undefined;
+    const isDomain = OPENAGENTS_HOSTNAMES.includes(hostname) && !isLoopbackDesktopApi(hostname, apiUrl);
     setIsOpenAgentsDomain(isDomain);
 
     if (!isDomain) {
