@@ -49,6 +49,7 @@ vi.mock('@/components/agents/agent-avatar', () => ({ AgentAvatar: () => null }))
 vi.mock('@/lib/i18n', () => ({
   useT: () => (key: string, values?: Record<string, string>) =>
     values?.error ? `${key}: ${values.error}` : key,
+  useFormatters: () => ({ timeAgo: () => '' }),
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 // The real Select mounts its items only once opened; rendered flat, the
