@@ -11,8 +11,11 @@ const h = vi.hoisted(() => ({
   threads: {} as Record<string, unknown[]>,
   seen: [] as unknown[][],
   reply: null as null | ((message: WorkspaceMessage) => void),
+  mentionAgent: null as null | ((agentName: string) => void),
   sent: [] as unknown[][],
   send: null as null | ((text: string) => Promise<void>),
+  draft: '' as string | undefined,
+  setDraft: null as null | ((draft: string) => void),
   mounted: null as null | { sessionId: string | null; setMessages: (msgs: unknown[]) => void },
 }));
 
@@ -54,10 +57,10 @@ vi.mock('@/hooks/use-polling', async () => {
   };
 });
 vi.mock('./chat-messages', () => ({
-  ChatMessages: ({ messages, onReply }: { messages: unknown[]; onReply: (message: WorkspaceMessage) => void }) => { h.seen.push(messages); h.reply = onReply; return null; },
+  ChatMessages: ({ messages, onReply, onMentionAgent }: { messages: unknown[]; onReply: (message: WorkspaceMessage) => void; onMentionAgent?: (agentName: string) => void }) => { h.seen.push(messages); h.reply = onReply; h.mentionAgent = onMentionAgent ?? null; return null; },
 }));
 vi.mock('./chat-input', () => ({
-  ChatInput: ({ onSend }: { onSend: (text: string) => Promise<void> }) => { h.send = onSend; return null; },
+  ChatInput: ({ onSend, draft, onDraftChange }: { onSend: (text: string) => Promise<void>; draft?: string; onDraftChange?: (draft: string) => void }) => { h.send = onSend; h.draft = draft; h.setDraft = onDraftChange ?? null; return null; },
 }));
 vi.mock('./yumi-guide', () => ({ YumiGuide: () => null }));
 vi.mock('./yumi-dm-intro', () => ({ YumiDmIntro: () => null }));
@@ -115,7 +118,7 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   resetOptimisticStoreForTests();
-  h.seen = []; h.sent = []; h.reply = null;
+  h.seen = []; h.sent = []; h.reply = null; h.mentionAgent = null;
   h.threads = {
     'thread-a': [msg('a1', 'thread-a'), step('a2', 'thread-a')],
     'thread-b': [msg('b1', 'thread-b'), step('b2', 'thread-b')],
@@ -214,4 +217,13 @@ it('replying to an agent preserves the citation and targets that agent even with
   expect(h.sent).toHaveLength(1);
   expect(h.sent[0][3]).toEqual(['bot']);
   expect(h.sent[0].at(-1)).toBe('agent-answer');
+});
+
+it('clicking an agent avatar puts its mention first in the draft, once', async () => {
+  await open('thread-a');
+  await act(async () => h.setDraft!('check the alerts'));
+  await act(async () => h.mentionAgent!('bot'));
+  expect(h.draft).toBe('@bot check the alerts');
+  await act(async () => h.mentionAgent!('bot'));
+  expect(h.draft).toBe('@bot check the alerts');
 });

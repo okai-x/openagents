@@ -120,12 +120,13 @@ interface ChatMessagesProps {
   /** Send a suggested prompt as the user's message (tap-to-ask chips). */
   onSuggestion?: (text: string) => void;
   onMentionPerson?: (email: string) => void;
+  onMentionAgent?: (agentName: string) => void;
   onReply?: (message: WorkspaceMessage) => void;
   /** The thread shown, when this is the main view: message links opened in-app scroll here. */
   targetSessionId?: string | null;
 }
 
-function ChatMessagesContent({ messages, agents, showAllSteps, className, scrollKey, loadOlder, hasOlder, loadingOlder, onSuggestion, onMentionPerson, onReply, targetSessionId }: ChatMessagesProps) {
+function ChatMessagesContent({ messages, agents, showAllSteps, className, scrollKey, loadOlder, hasOlder, loadingOlder, onSuggestion, onMentionPerson, onMentionAgent, onReply, targetSessionId }: ChatMessagesProps) {
   const t = useT();
   const [targetMessage, setTargetMessage] = useState(() => {
     if (typeof window === 'undefined') return null;
@@ -592,6 +593,7 @@ function ChatMessagesContent({ messages, agents, showAllSteps, className, scroll
                       isLast={index === groups.length - 1}
                       onSuggestion={onSuggestion}
                       onMentionPerson={onMentionPerson}
+                      onMentionAgent={onMentionAgent}
                       onReply={onReply}
                       onRecall={recall}
                     />

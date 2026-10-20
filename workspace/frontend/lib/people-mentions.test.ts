@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { displayHumanMentions, extractMentionedAgents, extractMentionedHumans, filterMentionPeople } from './people-mentions';
+import { displayHumanMentions, extractMentionedAgents, extractMentionedHumans, filterMentionPeople, withLeadingAgentMention } from './people-mentions';
 import type { TeamMember } from './types';
 
 const member = (email: string, displayName: string | null): TeamMember => ({
@@ -23,6 +23,23 @@ describe('extractMentionedAgents', () => {
     const names = ['scout', 'sam', 'demo'];
     expect(extractMentionedAgents('@scout look; ping @sam@demo.io (not sam@demo.io)', names)).toEqual(['scout']);
     expect(extractMentionedAgents('thanks @scout.', names)).toEqual(['scout']);
+  });
+});
+
+describe('withLeadingAgentMention', () => {
+  const names = ['sre', 'architect'];
+  it('joins the opening run of agent mentions so passive threads still route', () => {
+    expect(withLeadingAgentMention('', 'sre', names)).toBe('@sre ');
+    expect(withLeadingAgentMention('check the alerts', 'sre', names)).toBe('@sre check the alerts');
+    expect(withLeadingAgentMention('@architect review this', 'sre', names)).toBe('@architect @sre review this');
+    expect(withLeadingAgentMention('@architect', 'sre', names)).toBe('@architect @sre ');
+    expect(withLeadingAgentMention('@architect\nreview', 'sre', names)).toBe('@architect @sre\nreview');
+  });
+  it('goes before leading people and @all, and keeps an existing mention as it is', () => {
+    expect(withLeadingAgentMention('@all hello', 'sre', names)).toBe('@sre @all hello');
+    expect(withLeadingAgentMention('@sam@demo.io hi', 'sre', names)).toBe('@sre @sam@demo.io hi');
+    expect(withLeadingAgentMention('ask @sre first', 'sre', names)).toBe('ask @sre first');
+    expect(withLeadingAgentMention('请@sre看看', 'sre', names)).toBe('请@sre看看');
   });
 });
 

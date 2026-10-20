@@ -144,11 +144,12 @@ interface ChatMessageProps {
   /** Send a suggested prompt as the user's message (tap-to-ask chips). */
   onSuggestion?: (text: string) => void;
   onMentionPerson?: (email: string) => void;
+  onMentionAgent?: (agentName: string) => void;
   onReply?: (message: WorkspaceMessage) => void;
   onRecall?: (message: WorkspaceMessage) => Promise<void>;
 }
 
-export const ChatMessage = memo(function ChatMessage({ message, agents = [], isLast = false, onSuggestion, onMentionPerson, onReply, onRecall }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message, agents = [], isLast = false, onSuggestion, onMentionPerson, onMentionAgent, onReply, onRecall }: ChatMessageProps) {
   const { currentUser } = useWorkspace();
   const t = useT();
   const { formatTime } = useFormatters();
@@ -295,15 +296,27 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isL
   // ── Agent message ──
   // Full-bleed, no bubble — ChatGPT's assistant turn. The avatar and name stay:
   // a thread can have several agents, so the author still has to be readable.
+  // Like a person's name, the avatar and name @mention the agent in the composer.
+  const authorLabel = agent ? agentLabel(agent) : message.senderName;
+  const mentionAgent = onMentionAgent && agent ? () => onMentionAgent(agent.agentName) : undefined;
+  const mentionTitle = t('peopleMessaging.mentionName', { name: authorLabel });
   return (
     <div className="group py-2">
       <div className="flex items-start gap-3">
-        <AgentAvatar name={message.senderName} size={28} className="mt-0.5" />
+        {mentionAgent ? (
+          // The name button below is the keyboard and screen-reader control.
+          <button type="button" onClick={mentionAgent} tabIndex={-1} aria-hidden="true" title={mentionTitle} className="mt-0.5 shrink-0 cursor-pointer">
+            <AgentAvatar name={message.senderName} size={28} />
+          </button>
+        ) : <AgentAvatar name={message.senderName} size={28} className="mt-0.5" />}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="truncate text-sm font-semibold text-foreground">
-              {agent ? agentLabel(agent) : message.senderName}
-            </span>
+            {mentionAgent ? (
+              <button type="button" onClick={mentionAgent} title={mentionTitle}
+                className="truncate text-sm font-semibold text-foreground cursor-pointer hover:underline focus-visible:underline">
+                {authorLabel}
+              </button>
+            ) : <span className="truncate text-sm font-semibold text-foreground">{authorLabel}</span>}
             {agent && <AgentOwnershipBadge agent={agent} />}
             {timestamp && (
               <span className="text-[11px] text-muted-foreground">{timestamp}</span>

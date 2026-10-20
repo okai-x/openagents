@@ -22,6 +22,16 @@ it('uses the stable sender identity for mentions and the original message for re
  expect(reply).toHaveBeenCalledWith(message);
  expect(host.firstElementChild?.className).toContain('group/message');
 });
+it('mentions a known agent from its avatar or name and leaves unknown senders plain',async()=>{
+ const mention=vi.fn(),agentMessage={...message,senderType:'agent',senderName:'sre',senderAddress:'openagents:sre'},agents=[{agentName:'sre',displayName:'SRE'} as any];
+ await act(async()=>root.render(React.createElement(ChatMessage,{message:agentMessage,agents,onMentionAgent:mention})));
+ const [avatar,name]=Array.from(host.querySelectorAll<HTMLButtonElement>('button[title="peopleMessaging.mentionName"]'));
+ expect(avatar.tabIndex).toBe(-1);expect(name.textContent).toBe('SRE');
+ await act(async()=>{avatar.click();name.click();});
+ expect(mention.mock.calls).toEqual([['sre'],['sre']]);
+ await act(async()=>root.render(React.createElement(ChatMessage,{message:{...agentMessage,senderName:'gone'},agents,onMentionAgent:mention})));
+ expect(host.querySelector('button[title="peopleMessaging.mentionName"]')).toBeNull();expect(host.textContent).toContain('gone');
+});
 it('does not create a mention from an ambiguous legacy sender name',async()=>{
  const mention=vi.fn();await act(async()=>root.render(React.createElement(ChatMessage,{message:{...message,senderAddress:'human:user'},onMentionPerson:mention})));
  expect(host.querySelector('button')).toBeNull();expect(host.textContent).toContain('李红梦');

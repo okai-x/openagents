@@ -54,6 +54,22 @@ export function extractMentionedAgents(text: string, agentNames: readonly string
   return out;
 }
 
+/**
+ * Add `@agent` to the run of agent mentions that opens `text`. Passive threads
+ * route only on that opening run, so the mention works in either response
+ * mode. Text that already mentions the agent comes back unchanged.
+ */
+export function withLeadingAgentMention(text: string, agentName: string, agentNames: readonly string[]): string {
+  if (extractMentionedAgents(text, [agentName]).length) return text;
+  const opening = /\s*@([\w-]+)(?=\s|$)/y;
+  let end = 0;
+  for (let m = opening.exec(text); m && agentNames.includes(m[1]); m = opening.exec(text)) end = opening.lastIndex;
+  const head = text.slice(0, end).trimStart();
+  const rest = text.slice(end);
+  const lead = head ? `${head} @${agentName}` : `@${agentName}`;
+  return /^\s/.test(rest) ? lead + rest : `${lead} ${rest}`;
+}
+
 /** Roster people offered in the @ picker: everyone but yourself, filtered by name or email. */
 export function filterMentionPeople(
   team: readonly TeamMember[],

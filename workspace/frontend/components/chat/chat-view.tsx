@@ -41,6 +41,7 @@ import { acknowledgeMessage, pendingMessagesForDisplay } from '@/lib/optimistic-
 import { pendingResponderName, expectsAgentResponse } from '@/lib/pending-responder';
 import { useBrief } from './work-brief';
 import { subscribeComposerPrefill } from './composer-prefill';
+import { withLeadingAgentMention } from '@/lib/people-mentions';
 import { useMe } from '@/hooks/use-me';
 import { useHumanNames } from '@/hooks/use-team-roster';
 import { myAddress, dmPair, dmCounterpart as dmCounterpartOf, dmSessionId } from '@/lib/dm';
@@ -1009,6 +1010,11 @@ export function ChatView() {
             onMentionPerson={(!isDM || dmWritable) ? (email) => {
               const separator = currentDraft && !/\s$/.test(currentDraft) ? ' ' : '';
               handleDraftChange(`${currentDraft}${separator}@${email} `);
+              setFocusKey((key) => key + 1);
+            } : undefined}
+            // A DM already reaches its agent; elsewhere the mention opens the draft.
+            onMentionAgent={!isDM ? (agentName) => {
+              handleDraftChange(withLeadingAgentMention(currentDraft, agentName, agents.map((a) => a.agentName)));
               setFocusKey((key) => key + 1);
             } : undefined}
             onSuggestion={(text) => {
