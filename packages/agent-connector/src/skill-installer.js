@@ -601,4 +601,5 @@ module.exports = {
   listInstalledSkills,
   normalizeSkill,
   defaultFetcher,
+  parseSkillFrontmatter: _parseSkillFrontmatter,
 };

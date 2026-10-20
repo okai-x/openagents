@@ -614,6 +614,19 @@ class WorkspaceClient {
   }
 
   /**
+   * POST /v1/workspaces/{id}/members/{agentName}/inventory — what the agent
+   * can actually use, for its skills panel (see inventory.js).
+   */
+  async reportInventory(workspaceId, agentName, token, inventory) {
+    const data = await this._post(
+      `/v1/workspaces/${workspaceId}/members/${encodeURIComponent(agentName)}/inventory`,
+      inventory,
+      this._wsHeaders(token),
+    );
+    return data.data || data;
+  }
+
+  /**
    * Get session/channel info via GET /v1/workspaces/{id}/channels/{name}.
    */
   async getSession(workspaceId, channelName, token) {

@@ -436,6 +436,7 @@ class BaseAdapter {
     } catch (e) {
       this._log(`Warning: skill sync failed (non-fatal): ${e.message}`, 'warn');
     }
+    this._reportInventory(true).catch(() => {});
 
     // Fast-path operations (control-event cursor + heartbeat + control poll)
     // run BEFORE the message-cursor advance. Even though _skipExistingEvents
@@ -444,6 +445,8 @@ class BaseAdapter {
     // /status responsive immediately after join.
     await this._skipExistingControlEvents();
     const heartbeatInterval = setInterval(() => this._heartbeat(), 30000);
+    // Catches skills or MCP servers added by hand; sent only when they changed.
+    const inventoryInterval = setInterval(() => this._reportInventory().catch(() => {}), 10 * 60 * 1000);
     const controlPoller = this._controlPollerLoop();
 
     try {
@@ -459,6 +462,7 @@ class BaseAdapter {
       this._running = false;
       this._wakeControlPoller();
       clearInterval(heartbeatInterval);
+      clearInterval(inventoryInterval);
       if (this._presenceHeartbeatTimer) { clearTimeout(this._presenceHeartbeatTimer); this._presenceHeartbeatTimer = null; }
       try { await controlPoller; } catch {}
       try {
@@ -993,6 +997,7 @@ class BaseAdapter {
       }
       this._log(`skill.install: SUCCESS "${skillId}" → ${result.path}${result.partial ? ' (partial)' : ''}`);
       await this._onSkillsChanged();
+      this._reportInventory(true).catch(() => {});
     } catch (e) {
       const msg = e && e.message ? e.message : String(e);
       this._log(`skill.install: FAILED "${skillId}": ${msg}`, 'error');
@@ -1033,6 +1038,7 @@ class BaseAdapter {
         this._log(`skill.uninstall: failed to report status: ${e && e.message ? e.message : e}`, 'warn');
       }
       await this._onSkillsChanged();
+      this._reportInventory(true).catch(() => {});
     } catch (e) {
       const msg = e && e.message ? e.message : String(e);
       this._log(`skill.uninstall: FAILED "${skillId}": ${msg}`, 'error');
@@ -1044,6 +1050,29 @@ class BaseAdapter {
    * (e.g. rebuild prompt context). Default: no-op.
    */
   async _onSkillsChanged() {}
+
+  /**
+   * Tell the workspace what this agent can actually use (see inventory.js),
+   * for its skills panel. Sent at start and after skill changes, and otherwise
+   * only when it changed.
+   */
+  async _reportInventory(force = false) {
+    const { collectInventory } = require('../inventory');
+    const inventory = collectInventory({
+      agentType: this.agentType,
+      workingDir: this.workingDir,
+      env: this.agentEnv || {},
+      disabledModules: this.disabledModules || new Set(),
+    });
+    const key = JSON.stringify(inventory);
+    if (!force && key === this._lastInventory) return;
+    try {
+      await this.client.reportInventory(this.workspaceId, this.agentName, this.token, inventory);
+      this._lastInventory = key;
+    } catch (e) {
+      this._log(`Inventory report failed (non-fatal): ${e && e.message ? e.message : e}`, 'warn');
+    }
+  }
 
   /**
    * Post a chat message back to the requesting channel summarizing agent
