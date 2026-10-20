@@ -10,6 +10,7 @@ src/
   cli.js             CLI entry point (`agn` command): search, install, create, env, up/down, status, start/stop, logs, connect
   daemon.js          Long-running background process: spawns/monitors agent subprocesses, auto-restart with backoff, file-based IPC
   config.js          YAML config manager for ~/.openagents/daemon.yaml (agents, networks)
+  agent-home.js      Per-agent CLI config homes (CODEX_HOME / CLAUDE_CONFIG_DIR under ~/.openagents/homes), so a role never reads the person's ~/.codex or ~/.claude
   registry.js        Agent catalog: fetches from remote API or bundled registry.json, 24h cache
   installer.js       Agent runtime installer: npm/curl/binary, tracks in installed_agents.json
   postinstall-stub.js Recognizes the placeholder an npm package leaves as its CLI when its postinstall was skipped (ignore-scripts) — the installer repairs it, the opencode adapter reports it

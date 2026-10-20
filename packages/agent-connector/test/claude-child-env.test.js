@@ -42,6 +42,12 @@ describe('ClaudeAdapter._buildChildEnv — SDK-harness stripping', () => {
     assert.strictEqual(env.CLAUDE_CODE_OAUTH_TOKEN, 'sk-ant-oat01-abc');
   });
 
+  // Without it the CLI falls back to the person's own ~/.claude (agent-home.js).
+  test("keeps the agent's own config home", () => {
+    const env = build({ CLAUDE_CONFIG_DIR: '/home/me/.openagents/homes/architect/claude' });
+    assert.strictEqual(env.CLAUDE_CONFIG_DIR, '/home/me/.openagents/homes/architect/claude');
+  });
+
   test('does not mutate the env it was handed', () => {
     const input = { CLAUDECODE: '1', ANTHROPIC_API_KEY: 'k' };
     build(input);

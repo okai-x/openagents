@@ -15,6 +15,7 @@ const { supportsCliModels } = require('./cli-models');
 const { AUTH_MODE_KEY, isCliLogin, modelKeys, stripForCliLogin, typeEnvFor } = require('./env');
 const { getEnhancedEnv, whichBinary, IS_WINDOWS, defaultAgentWorkdir } = require('./paths');
 const { LogWriter } = require('./log-writer');
+const { ensureAgentHomes } = require('./agent-home');
 
 // A signed-in agent's model list is asked for again after this long. What a
 // CLI is offered changes when the CLI is upgraded (a vendor holds new models
@@ -901,6 +902,8 @@ async _runNodeCommand(n, cmd) {
    * Call this from the foreground daemon process.
    */
   async start() {
+    // Before anything reads the agents, so their fingerprints include the home.
+    this._ensureAgentHomes();
     const agents = this.config.getAgents();
     for (const agent of agents) {
       this._launchAgent(agent);
@@ -1696,6 +1699,16 @@ async _runNodeCommand(n, cmd) {
     return [binary, ...args];
   }
 
+  /** Each Codex and Claude agent runs on its own CLI config home (see agent-home.js). */
+  _ensureAgentHomes() {
+    try {
+      const changed = ensureAgentHomes(this.config);
+      if (changed.length) this._log(`Gave ${changed.join(', ')} their own CLI config home`);
+    } catch (err) {
+      this._log(`Could not set up agent config homes: ${err.message}`, 'error');
+    }
+  }
+
   _buildAgentEnv(agentCfg) {
     const type = agentCfg.type || 'openclaw';
     const merged = this.envManager.getForAgent(type, this.registry, agentCfg.env);
@@ -1847,6 +1860,7 @@ async _runNodeCommand(n, cmd) {
     const oldConfigs = this._cachedAgentConfigs || {};
     // Re-read config from disk
     this.config.load();
+    this._ensureAgentHomes();
     const newAgents = this.config.getAgents();
     const newNames = new Set(newAgents.map(a => a.name));
     const newConfigs = {};
